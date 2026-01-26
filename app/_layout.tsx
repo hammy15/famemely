@@ -1,24 +1,23 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
+import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { useAuthStore } from '@/stores/authStore';
+import { initializeStripe } from '@/lib/stripe';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -27,19 +26,35 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  const initialize = useAuthStore((state) => state.initialize);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    // Initialize auth listener
+    const unsubscribe = initialize();
+
+    // Initialize Stripe
+    initializeStripe();
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (loaded && isInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, isInitialized]);
 
-  if (!loaded) {
-    return null;
+  if (!loaded || !isInitialized) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-900">
+        <ActivityIndicator size="large" color="#22c55e" />
+      </View>
+    );
   }
 
   return <RootLayoutNav />;
@@ -47,12 +62,43 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const user = useAuthStore((state) => state.user);
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!user && !inAuthGroup) {
+      // Redirect to login if not authenticated
+      router.replace('/(auth)/login');
+    } else if (user && inAuthGroup) {
+      // Redirect to home if authenticated
+      router.replace('/(tabs)');
+    }
+  }, [user, segments]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="game/[id]"
+          options={{
+            headerShown: true,
+            title: 'Game',
+            headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen
+          name="game/lobby/[id]"
+          options={{
+            headerShown: true,
+            title: 'Lobby',
+            headerBackTitle: 'Back',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );
