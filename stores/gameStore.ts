@@ -20,7 +20,7 @@ interface GameState {
   isLoading: boolean;
   error: string | null;
   timeRemaining: number;
-  timerInterval: NodeJS.Timeout | null;
+  timerInterval: ReturnType<typeof setInterval> | null;
 
   // Subscriptions
   unsubscribeGame: (() => void) | null;

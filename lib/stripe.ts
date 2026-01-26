@@ -1,15 +1,25 @@
-import { initStripe, useStripe as useStripeHook } from '@stripe/stripe-react-native';
+import { Platform } from 'react-native';
 
 // Stripe configuration
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_YOUR_KEY';
 
-// Initialize Stripe
+// Initialize Stripe (native only)
 export const initializeStripe = async () => {
-  await initStripe({
-    publishableKey: STRIPE_PUBLISHABLE_KEY,
-    merchantIdentifier: 'merchant.com.famemely',
-    urlScheme: 'famemely',
-  });
+  if (Platform.OS === 'web') {
+    console.log('Stripe not available on web');
+    return;
+  }
+
+  try {
+    const { initStripe } = await import('@stripe/stripe-react-native');
+    await initStripe({
+      publishableKey: STRIPE_PUBLISHABLE_KEY,
+      merchantIdentifier: 'merchant.com.famemely',
+      urlScheme: 'famemely',
+    });
+  } catch (error) {
+    console.log('Stripe initialization skipped:', error);
+  }
 };
 
 // Product IDs
@@ -29,4 +39,15 @@ export const PREMIUM_FEATURES = [
   'Unlimited champion cards export',
 ];
 
-export { useStripeHook as useStripe };
+// useStripe hook (native only)
+export const useStripe = () => {
+  if (Platform.OS === 'web') {
+    return {
+      initPaymentSheet: async () => ({ error: { message: 'Not available on web' } }),
+      presentPaymentSheet: async () => ({ error: { message: 'Not available on web' } }),
+    };
+  }
+
+  // Dynamic import would be used in actual component
+  return null;
+};
