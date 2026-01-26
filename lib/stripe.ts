@@ -10,13 +10,17 @@ export const initializeStripe = async () => {
     return;
   }
 
+  // Only import on native platforms
+  // This uses a try-catch to handle web bundling
   try {
-    const { initStripe } = await import('@stripe/stripe-react-native');
-    await initStripe({
-      publishableKey: STRIPE_PUBLISHABLE_KEY,
-      merchantIdentifier: 'merchant.com.famemely',
-      urlScheme: 'famemely',
-    });
+    const stripeModule = require('@stripe/stripe-react-native');
+    if (stripeModule && stripeModule.initStripe) {
+      await stripeModule.initStripe({
+        publishableKey: STRIPE_PUBLISHABLE_KEY,
+        merchantIdentifier: 'merchant.com.famemely',
+        urlScheme: 'famemely',
+      });
+    }
   } catch (error) {
     console.log('Stripe initialization skipped:', error);
   }
@@ -39,7 +43,7 @@ export const PREMIUM_FEATURES = [
   'Unlimited champion cards export',
 ];
 
-// useStripe hook (native only)
+// useStripe hook placeholder (actual implementation would use the stripe hook)
 export const useStripe = () => {
   if (Platform.OS === 'web') {
     return {
@@ -48,6 +52,5 @@ export const useStripe = () => {
     };
   }
 
-  // Dynamic import would be used in actual component
   return null;
 };

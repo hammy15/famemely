@@ -1,24 +1,38 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StatusBar } from 'react-native';
 import 'react-native-reanimated';
 import '../global.css';
 
-import { useColorScheme } from '@/components/useColorScheme';
 import { useAuthStore } from '@/stores/authStore';
 import { initializeStripe } from '@/lib/stripe';
+import { colors } from '@/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  initialRouteName: '(main)',
 };
 
 SplashScreen.preventAutoHideAsync();
+
+// Custom dark theme with game colors
+const GameDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: colors.primary,
+    background: colors.background.primary,
+    card: colors.background.secondary,
+    text: colors.text.primary,
+    border: colors.background.tertiary,
+    notification: colors.secondary,
+  },
+};
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -51,8 +65,8 @@ export default function RootLayout() {
 
   if (!loaded || !isInitialized) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-900">
-        <ActivityIndicator size="large" color="#22c55e" />
+      <View className="flex-1 items-center justify-center bg-background-primary">
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -61,7 +75,6 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
   const user = useAuthStore((state) => state.user);
   const segments = useSegments();
   const router = useRouter();
@@ -73,30 +86,102 @@ function RootLayoutNav() {
       // Redirect to login if not authenticated
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
-      // Redirect to home if authenticated
-      router.replace('/(tabs)');
+      // Redirect to main game launcher if authenticated
+      router.replace('/(main)' as Href);
     }
   }, [user, segments]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
+    <ThemeProvider value={GameDarkTheme}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.background.primary} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background.primary },
+          animation: 'fade',
+        }}
+      >
+        {/* Auth Flow */}
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="game/[id]"
-          options={{
-            headerShown: true,
-            title: 'Game',
-            headerBackTitle: 'Back',
-          }}
-        />
+
+        {/* Main Game Launcher */}
+        <Stack.Screen name="(main)" options={{ headerShown: false }} />
+
+        {/* Game Lobby - Full Screen Modal */}
         <Stack.Screen
           name="game/lobby/[id]"
           options={{
+            presentation: 'fullScreenModal',
+            headerShown: false,
+            gestureEnabled: true,
+            animation: 'slide_from_bottom',
+          }}
+        />
+
+        {/* Active Game - Full Screen Modal (no gestures during play) */}
+        <Stack.Screen
+          name="game/[id]"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: false,
+            gestureEnabled: false,  // Prevent accidental exits during game
+            animation: 'slide_from_bottom',
+          }}
+        />
+
+        {/* Secondary Screens - Stack Navigation */}
+        <Stack.Screen
+          name="profile"
+          options={{
             headerShown: true,
-            title: 'Lobby',
-            headerBackTitle: 'Back',
+            headerTitle: 'Profile',
+            headerStyle: { backgroundColor: colors.background.secondary },
+            headerTintColor: colors.text.primary,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
+          name="champions"
+          options={{
+            headerShown: true,
+            headerTitle: 'Champion Cards',
+            headerStyle: { backgroundColor: colors.background.secondary },
+            headerTintColor: colors.text.primary,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: true,
+            headerTitle: 'Settings',
+            headerStyle: { backgroundColor: colors.background.secondary },
+            headerTintColor: colors.text.primary,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
+          name="social"
+          options={{
+            headerShown: true,
+            headerTitle: 'Social',
+            headerStyle: { backgroundColor: colors.background.secondary },
+            headerTintColor: colors.text.primary,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
+          name="create"
+          options={{
+            headerShown: true,
+            headerTitle: 'Create Meme',
+            headerStyle: { backgroundColor: colors.background.secondary },
+            headerTintColor: colors.text.primary,
+            animation: 'slide_from_right',
           }}
         />
       </Stack>
