@@ -36,10 +36,17 @@ export default function GameCard({ card, onPress }: GameCardProps) {
 
         {/* Card Info */}
         <View className="p-3">
-          <Text className="text-gray-400 text-xs mb-1">Winning Prompt</Text>
-          <Text className="text-white text-sm font-medium" numberOfLines={2}>
-            "{card.prompt}"
-          </Text>
+          <View className="flex-row items-center mb-1">
+            <Text className="text-gray-400 text-xs">
+              {card.winType === 'both' ? "Judge's Pick + People's Choice" :
+               card.winType === 'audience' ? "People's Choice" : "Judge's Pick"}
+            </Text>
+          </View>
+          {card.captions && card.captions.length > 0 && (
+            <Text className="text-white text-sm font-medium" numberOfLines={2}>
+              "{card.captions[0].text}"
+            </Text>
+          )}
 
           <View className="flex-row items-center justify-between mt-3 pt-2 border-t border-gray-800">
             <Text className="text-gray-500 text-xs">

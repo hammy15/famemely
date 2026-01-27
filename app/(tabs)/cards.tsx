@@ -65,9 +65,11 @@ export default function CardsScreen() {
             </View>
           )}
           <View className="p-2">
-            <Text className="text-gray-400 text-xs" numberOfLines={2}>
-              "{item.prompt}"
-            </Text>
+            {item.captions && item.captions.length > 0 && (
+              <Text className="text-gray-400 text-xs" numberOfLines={2}>
+                "{item.captions[0].text}"
+              </Text>
+            )}
             <View className="flex-row items-center justify-between mt-2">
               <Text className="text-gray-500 text-xs">
                 {item.wonAt ? formatRelativeTime(item.wonAt) : 'Recently'}

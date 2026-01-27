@@ -1,6 +1,6 @@
 // Mock data and functions for demo mode
 import { Timestamp } from 'firebase/firestore';
-import type { User, Game, ChampionCard, ChatMessage, Prompt, PlayerInfo } from '@/types';
+import type { User, Game, ChampionCard, ChatMessage, Prompt, PlayerInfo, GamePhoto, Caption } from '@/types';
 
 // Demo mode flag
 export const DEMO_MODE = true;
@@ -22,10 +22,25 @@ export const MOCK_USER: User = {
 
 // Mock players for games
 export const MOCK_PLAYERS: PlayerInfo[] = [
-  { id: 'demo-user-1', displayName: 'MemeLord420', photoURL: null, score: 0, isJudge: false, hasSubmitted: false },
-  { id: 'demo-user-2', displayName: 'DankMaster', photoURL: null, score: 0, isJudge: false, hasSubmitted: false },
-  { id: 'demo-user-3', displayName: 'MemeQueen', photoURL: null, score: 0, isJudge: true, hasSubmitted: false },
-  { id: 'demo-user-4', displayName: 'LolzGuy', photoURL: null, score: 0, isJudge: false, hasSubmitted: false },
+  { id: 'demo-user-1', displayName: 'MemeLord420', photoURL: null, score: 0, isJudge: false, hasSubmitted: false, isReady: true, photosUploaded: 3 },
+  { id: 'demo-user-2', displayName: 'DankMaster', photoURL: null, score: 0, isJudge: false, hasSubmitted: false, isReady: true, photosUploaded: 2 },
+  { id: 'demo-user-3', displayName: 'MemeQueen', photoURL: null, score: 0, isJudge: true, hasSubmitted: false, isReady: true, photosUploaded: 4 },
+  { id: 'demo-user-4', displayName: 'LolzGuy', photoURL: null, score: 0, isJudge: false, hasSubmitted: false, isReady: true, photosUploaded: 2 },
+];
+
+// 50 Default photos for the game pool
+export const DEFAULT_PHOTOS: GamePhoto[] = Array.from({ length: 50 }, (_, i) => ({
+  id: `default-${i + 1}`,
+  uploaderId: 'system',
+  photoUrl: `https://picsum.photos/seed/default${i + 1}/800/800`,
+  isDefault: true,
+  uploadedAt: Timestamp.now(),
+}));
+
+// Funny photo categories for better variety
+export const DEFAULT_PHOTO_CATEGORIES = [
+  'cats', 'dogs', 'surprised', 'confused', 'happy', 'angry',
+  'weird', 'stock', 'reaction', 'vintage', 'nature', 'food'
 ];
 
 // Mock prompts
@@ -42,6 +57,12 @@ export const MOCK_PROMPTS: Prompt[] = [
   { id: '10', text: "When you open your phone and forget why", category: 'life', createdBy: 'system' },
 ];
 
+// Mock captions for champion cards
+export const MOCK_CAPTIONS: Caption[] = [
+  { id: 'cap-1', text: 'Me at 3am', x: 50, y: 15, fontSize: 32, fontFamily: 'Impact', color: '#FFFFFF', rotation: 0, scale: 1, style: 'outline' },
+  { id: 'cap-2', text: 'Still debugging', x: 50, y: 85, fontSize: 28, fontFamily: 'Impact', color: '#FFFFFF', rotation: 0, scale: 1, style: 'outline' },
+];
+
 // Mock champion cards
 export const MOCK_CHAMPION_CARDS: ChampionCard[] = [
   {
@@ -49,27 +70,33 @@ export const MOCK_CHAMPION_CARDS: ChampionCard[] = [
     playerId: 'demo-user-1',
     gameId: 'game-1',
     memeUrl: 'https://picsum.photos/seed/meme1/400/400',
-    prompt: 'When your code works on the first try',
+    originalPhotoUrl: 'https://picsum.photos/seed/original1/400/400',
+    captions: [MOCK_CAPTIONS[0]],
     wonAt: Timestamp.now(),
     likes: 42,
+    winType: 'judge',
   },
   {
     id: 'card-2',
     playerId: 'demo-user-1',
     gameId: 'game-2',
     memeUrl: 'https://picsum.photos/seed/meme2/400/400',
-    prompt: 'The group chat at 3am',
+    originalPhotoUrl: 'https://picsum.photos/seed/original2/400/400',
+    captions: MOCK_CAPTIONS,
     wonAt: Timestamp.now(),
     likes: 28,
+    winType: 'audience',
   },
   {
     id: 'card-3',
     playerId: 'demo-user-1',
     gameId: 'game-3',
     memeUrl: 'https://picsum.photos/seed/meme3/400/400',
-    prompt: 'Me explaining to my mom what I do',
+    originalPhotoUrl: 'https://picsum.photos/seed/original3/400/400',
+    captions: [MOCK_CAPTIONS[1]],
     wonAt: Timestamp.now(),
     likes: 15,
+    winType: 'both',
   },
 ];
 
@@ -80,9 +107,13 @@ export const MOCK_CHAT_MESSAGES: ChatMessage[] = [
   { id: '3', senderId: 'demo-user-4', senderName: 'LolzGuy', message: 'glhf everyone', timestamp: Timestamp.now() },
 ];
 
-// Generate a mock game
+// Generate game code
+export const generateGameCode = () =>
+  Math.random().toString(36).substring(2, 8).toUpperCase();
+
+// Generate a mock game v2 (caption battle)
 export const createMockGame = (hostId: string): Game => {
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const code = generateGameCode();
   return {
     id: `game-${Date.now()}`,
     hostId,
@@ -90,19 +121,38 @@ export const createMockGame = (hostId: string): Game => {
     players: [hostId],
     maxPlayers: 8,
     currentRound: 0,
-    totalRounds: 5,
-    currentJudgeIndex: 0,
-    currentPrompt: '',
+    totalRounds: 10,              // Max rounds (can end early if cardsToWin reached)
+    currentJudgeId: hostId,       // Host starts as first judge
+
+    // Photo pool (empty until photo_upload phase)
+    photos: {},
+    currentPhotoId: undefined,
+
+    // Submissions & Voting
     submissions: {},
+    votes: [],
+    judgeWinnerId: undefined,
+    audienceWinnerId: undefined,
+
+    // Scores
     scores: { [hostId]: 0 },
+
+    // Time extensions
+    timeExtensions: [],
+
     createdAt: Timestamp.now(),
     settings: {
-      timePerRound: 60,
+      timePerRound: 90,           // 1:30 default for captioning
+      cardsToWin: 5,              // First to 5 cards wins
+      useDefaultPhotos: true,     // Include 50 default photos
       isPrivate: true,
       code,
     },
   };
 };
+
+// Legacy createMockGame for backwards compatibility
+export const createMockGameLegacy = createMockGame;
 
 // Mock meme URLs for submissions
 export const MOCK_MEME_URLS = [

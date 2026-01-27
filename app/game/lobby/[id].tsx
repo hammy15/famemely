@@ -55,8 +55,8 @@ export default function GameLobbyScreen() {
   }, [id]);
 
   useEffect(() => {
-    // Navigate to game when it starts
-    if (currentGame?.status === 'playing') {
+    // Navigate to game when it starts (photo_upload is the first phase after lobby)
+    if (currentGame?.status && currentGame.status !== 'lobby') {
       router.replace(`/game/${id}`);
     }
   }, [currentGame?.status]);

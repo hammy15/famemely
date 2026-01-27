@@ -90,7 +90,7 @@ export default function GameScreen() {
     if (currentGame?.status && currentGame.status !== lastStatus) {
       if (lastStatus !== null) {
         // Trigger phase transition animation
-        if (currentGame.status === 'playing') {
+        if (currentGame.status === 'captioning') {
           setPhaseType('selecting');
           setShowPhaseTransition(true);
         } else if (currentGame.status === 'judging') {
@@ -113,18 +113,23 @@ export default function GameScreen() {
 
   const isJudge =
     currentGame &&
-    players[currentGame.currentJudgeIndex]?.id === user?.id;
+    currentGame.currentJudgeId === user?.id;
 
   const hasSubmitted = currentGame?.submissions?.[user?.id || ''];
-  const currentJudge = currentGame ? players[currentGame.currentJudgeIndex] : null;
-  const totalTime = currentGame?.settings?.timePerRound || 60;
+  const currentJudge = currentGame ? players.find(p => p.id === currentGame.currentJudgeId) : null;
+  const totalTime = currentGame?.settings?.timePerRound || 90;
 
-  // Find winner info for celebration
-  const roundWinner = currentGame?.roundWinner
-    ? players.find((p) => p.id === currentGame.roundWinner)
+  // Find winner info for celebration (judge's pick takes priority for display)
+  const roundWinner = currentGame?.judgeWinnerId
+    ? players.find((p) => p.id === currentGame.judgeWinnerId)
     : null;
-  const winningSubmission = currentGame?.roundWinner && currentGame.submissions
-    ? currentGame.submissions[currentGame.roundWinner]
+  const winningSubmission = currentGame?.judgeWinnerId && currentGame.submissions
+    ? currentGame.submissions[currentGame.judgeWinnerId]
+    : null;
+
+  // Get current photo for display
+  const currentPhoto = currentGame?.currentPhotoId && currentGame.photos
+    ? currentGame.photos[currentGame.currentPhotoId]
     : null;
 
   const handlePickMeme = async () => {
@@ -210,8 +215,8 @@ export default function GameScreen() {
       <CelebrationOverlay
         visible={showCelebration}
         winnerName={roundWinner?.displayName || 'Unknown'}
-        memeUrl={winningSubmission?.memeUrl}
-        prompt={currentGame.currentPrompt}
+        memeUrl={winningSubmission?.finalImageUrl || currentPhoto?.photoUrl}
+        prompt="Judge's Pick!"
         onContinue={handleContinue}
       />
 
@@ -249,7 +254,7 @@ export default function GameScreen() {
           </View>
 
           {/* Timer */}
-          {currentGame.status === 'playing' && (
+          {currentGame.status === 'captioning' && (
             <Animated.View entering={SlideInUp.delay(300)} className="px-4 mb-4">
               <CountdownTimer
                 timeRemaining={timeRemaining}
@@ -271,30 +276,31 @@ export default function GameScreen() {
                 key={player.id}
                 name={player.displayName}
                 score={currentGame.scores?.[player.id] || 0}
-                isJudge={index === currentGame.currentJudgeIndex}
+                isJudge={player.id === currentGame.currentJudgeId}
                 hasSubmitted={!!currentGame.submissions?.[player.id]}
-                isWinner={player.id === currentGame.roundWinner && currentGame.status === 'results'}
+                isWinner={player.id === currentGame.judgeWinnerId && currentGame.status === 'results'}
                 avatarColor={colors.players[index % colors.players.length]}
                 compact
               />
             ))}
           </ScrollView>
 
-          {/* Prompt Display */}
-          <View className="mx-4 mb-4 bg-background-secondary rounded-xl p-4">
-            <Text className="text-gray-400 text-sm text-center mb-1">PROMPT</Text>
-            <Text
-              className="text-white text-2xl font-black text-center"
-              style={{ lineHeight: 32 }}
-            >
-              "{currentGame.currentPrompt}"
-            </Text>
-          </View>
+          {/* Current Photo Display (when captioning) */}
+          {currentPhoto && (currentGame.status === 'captioning' || currentGame.status === 'judging') && (
+            <View className="mx-4 mb-4 bg-background-secondary rounded-xl overflow-hidden">
+              <Text className="text-gray-400 text-sm text-center py-2">CAPTION THIS PHOTO</Text>
+              <Image
+                source={{ uri: currentPhoto.photoUrl }}
+                className="w-full aspect-square"
+                resizeMode="cover"
+              />
+            </View>
+          )}
 
           {/* Main Content Area */}
           <View className="flex-1 px-4">
-            {/* PLAYING PHASE */}
-            {currentGame.status === 'playing' && (
+            {/* CAPTIONING PHASE */}
+            {currentGame.status === 'captioning' && (
               isJudge ? (
                 // Judge View - Waiting for submissions
                 <Animated.View
@@ -381,14 +387,14 @@ export default function GameScreen() {
                 // Player - Submit Meme
                 <Animated.View entering={FadeIn.delay(300)} className="flex-1">
                   <Text className="text-white text-xl font-black mb-4 text-center">
-                    PICK YOUR MEME
+                    ADD YOUR CAPTIONS
                   </Text>
 
-                  {/* Meme Preview/Picker */}
+                  {/* Caption Preview - TODO: Replace with CaptionEditor component */}
                   <TouchableOpacity
                     onPress={handlePickMeme}
                     className="flex-1 bg-background-secondary rounded-xl items-center justify-center mb-4 overflow-hidden"
-                    style={{ maxHeight: SCREEN_WIDTH * 0.8 }}
+                    style={{ maxHeight: SCREEN_WIDTH * 0.5 }}
                   >
                     {memeUri ? (
                       <Image
@@ -399,41 +405,39 @@ export default function GameScreen() {
                     ) : (
                       <View className="items-center">
                         <MaterialCommunityIcons
-                          name="image-plus"
+                          name="format-text"
                           size={80}
                           color={colors.text.muted}
                         />
                         <Text className="text-gray-400 text-lg mt-4">
-                          Tap to choose a meme
+                          Tap to add caption
                         </Text>
                       </View>
                     )}
                   </TouchableOpacity>
 
                   {/* Action Buttons */}
-                  {memeUri && (
-                    <View className="flex-row gap-3">
-                      <TouchableOpacity
-                        onPress={handlePickMeme}
-                        className="flex-1 bg-background-secondary py-4 rounded-xl items-center"
-                      >
-                        <Ionicons name="swap-horizontal" size={24} color={colors.text.secondary} />
-                        <Text className="text-gray-400 mt-1">Change</Text>
-                      </TouchableOpacity>
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={handlePickMeme}
+                      className="flex-1 bg-background-secondary py-4 rounded-xl items-center"
+                    >
+                      <Ionicons name="text" size={24} color={colors.text.secondary} />
+                      <Text className="text-gray-400 mt-1">Edit Caption</Text>
+                    </TouchableOpacity>
 
-                      <View className="flex-2">
-                        <GameButton
-                          label="SUBMIT!"
-                          variant="submit"
-                          size="lg"
-                          glow
-                          onPress={handleSubmitMeme}
-                          loading={isSubmitting}
-                          icon={<Ionicons name="send" size={24} color={colors.background.primary} />}
-                        />
-                      </View>
+                    <View className="flex-2">
+                      <GameButton
+                        label="SUBMIT!"
+                        variant="submit"
+                        size="lg"
+                        glow
+                        onPress={handleSubmitMeme}
+                        loading={isSubmitting}
+                        icon={<Ionicons name="send" size={24} color={colors.background.primary} />}
+                      />
                     </View>
-                  )}
+                  </View>
                 </Animated.View>
               )
             )}

@@ -25,8 +25,7 @@ export function useGame(gameId: string | undefined) {
   }, [gameId]);
 
   const isHost = currentGame?.hostId === user?.id;
-  const isJudge =
-    currentGame && players[currentGame.currentJudgeIndex]?.id === user?.id;
+  const isJudge = currentGame?.currentJudgeId === user?.id;
   const hasSubmitted = currentGame?.submissions?.[user?.id || ''];
 
   const submitMeme = useCallback(

@@ -69,7 +69,7 @@ export default function JudgeView({ submissions, players }: JudgeViewProps) {
             style={{ width: 280, height: 320 }}
           >
             <Image
-              source={{ uri: submission.memeUrl }}
+              source={{ uri: submission.finalImageUrl }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
