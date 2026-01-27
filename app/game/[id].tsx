@@ -44,6 +44,9 @@ import PhaseTransition from '@/components/game/PhaseTransition';
 import CelebrationOverlay from '@/components/game/CelebrationOverlay';
 import ScorePop from '@/components/game/ScorePop';
 import ConfettiExplosion from '@/components/game/ConfettiExplosion';
+import PhotoUploader from '@/components/game/PhotoUploader';
+import PhotoPicker from '@/components/game/PhotoPicker';
+import TimeExtensionButton from '@/components/game/TimeExtensionButton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -55,11 +58,16 @@ export default function GameScreen() {
     currentGame,
     players,
     timeRemaining,
+    voteCounts,
     subscribeToCurrentGame,
     leaveGame,
     submitPlayerMeme,
     selectWinner,
     nextRound,
+    finishPhotoUpload,
+    submitCaption,
+    submitAudienceVote,
+    calculateResults,
   } = useGameStore();
   const { subscribeToGameChat, unsubscribeFromChat } = useChatStore();
 
@@ -111,9 +119,9 @@ export default function GameScreen() {
     }
   }, [currentGame?.status]);
 
-  const isJudge =
-    currentGame &&
-    currentGame.currentJudgeId === user?.id;
+  const isHost = currentGame?.hostId === user?.id;
+
+  const isJudge = !!(currentGame && currentGame.currentJudgeId === user?.id);
 
   const hasSubmitted = currentGame?.submissions?.[user?.id || ''];
   const currentJudge = currentGame ? players.find(p => p.id === currentGame.currentJudgeId) : null;
@@ -254,13 +262,18 @@ export default function GameScreen() {
           </View>
 
           {/* Timer */}
-          {currentGame.status === 'captioning' && (
+          {(currentGame.status === 'captioning' || currentGame.status === 'voting') && (
             <Animated.View entering={SlideInUp.delay(300)} className="px-4 mb-4">
-              <CountdownTimer
-                timeRemaining={timeRemaining}
-                totalTime={totalTime}
-                size="large"
-              />
+              <View className="flex-row items-center justify-between">
+                <CountdownTimer
+                  timeRemaining={timeRemaining}
+                  totalTime={totalTime}
+                  size="large"
+                />
+                {isJudge && currentGame.status === 'captioning' && (
+                  <TimeExtensionButton isJudge={isJudge} timeRemaining={timeRemaining} />
+                )}
+              </View>
             </Animated.View>
           )}
 
@@ -299,6 +312,23 @@ export default function GameScreen() {
 
           {/* Main Content Area */}
           <View className="flex-1 px-4">
+            {/* PHOTO UPLOAD PHASE */}
+            {currentGame.status === 'photo_upload' && (
+              <PhotoUploader
+                photos={currentGame.photos || {}}
+                onFinish={finishPhotoUpload}
+                isHost={isHost}
+              />
+            )}
+
+            {/* PICKING PHASE */}
+            {currentGame.status === 'picking' && (
+              <PhotoPicker
+                photos={currentGame.photos || {}}
+                isJudge={isJudge}
+              />
+            )}
+
             {/* CAPTIONING PHASE */}
             {currentGame.status === 'captioning' && (
               isJudge ? (
