@@ -47,6 +47,10 @@ import ConfettiExplosion from '@/components/game/ConfettiExplosion';
 import PhotoUploader from '@/components/game/PhotoUploader';
 import PhotoPicker from '@/components/game/PhotoPicker';
 import TimeExtensionButton from '@/components/game/TimeExtensionButton';
+import CaptionEditor from '@/components/game/CaptionEditor';
+import VotingCard from '@/components/game/VotingCard';
+import VoteResults from '@/components/game/VoteResults';
+import { useCaptionStore } from '@/stores/captionStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -70,6 +74,7 @@ export default function GameScreen() {
     calculateResults,
   } = useGameStore();
   const { subscribeToGameChat, unsubscribeFromChat } = useChatStore();
+  const { setPhoto, clearAll: clearCaptions } = useCaptionStore();
 
   const [showChat, setShowChat] = useState(false);
   const [memeUri, setMemeUri] = useState<string | null>(null);
@@ -140,6 +145,16 @@ export default function GameScreen() {
     ? currentGame.photos[currentGame.currentPhotoId]
     : null;
 
+  // Set photo in caption store when entering captioning phase
+  useEffect(() => {
+    if (currentGame?.status === 'captioning' && currentPhoto) {
+      setPhoto(currentPhoto.photoUrl);
+    }
+    if (currentGame?.status !== 'captioning') {
+      clearCaptions();
+    }
+  }, [currentGame?.status, currentPhoto?.photoUrl]);
+
   const handlePickMeme = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -150,6 +165,21 @@ export default function GameScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setMemeUri(result.assets[0].uri);
+    }
+  };
+
+  const handleCaptionSubmit = async (captions: any[]) => {
+    if (!user || !currentPhoto) return;
+
+    setIsSubmitting(true);
+    try {
+      // For now, use the photo URL as the final image
+      // In production, you'd capture the canvas with captions baked in
+      await submitCaption(user.id, captions, currentPhoto.photoUrl);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to submit');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -413,63 +443,14 @@ export default function GameScreen() {
                     Waiting for other players...
                   </Text>
                 </Animated.View>
-              ) : (
-                // Player - Submit Meme
-                <Animated.View entering={FadeIn.delay(300)} className="flex-1">
-                  <Text className="text-white text-xl font-black mb-4 text-center">
-                    ADD YOUR CAPTIONS
-                  </Text>
-
-                  {/* Caption Preview - TODO: Replace with CaptionEditor component */}
-                  <TouchableOpacity
-                    onPress={handlePickMeme}
-                    className="flex-1 bg-background-secondary rounded-xl items-center justify-center mb-4 overflow-hidden"
-                    style={{ maxHeight: SCREEN_WIDTH * 0.5 }}
-                  >
-                    {memeUri ? (
-                      <Image
-                        source={{ uri: memeUri }}
-                        className="w-full h-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="items-center">
-                        <MaterialCommunityIcons
-                          name="format-text"
-                          size={80}
-                          color={colors.text.muted}
-                        />
-                        <Text className="text-gray-400 text-lg mt-4">
-                          Tap to add caption
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Action Buttons */}
-                  <View className="flex-row gap-3">
-                    <TouchableOpacity
-                      onPress={handlePickMeme}
-                      className="flex-1 bg-background-secondary py-4 rounded-xl items-center"
-                    >
-                      <Ionicons name="text" size={24} color={colors.text.secondary} />
-                      <Text className="text-gray-400 mt-1">Edit Caption</Text>
-                    </TouchableOpacity>
-
-                    <View className="flex-2">
-                      <GameButton
-                        label="SUBMIT!"
-                        variant="submit"
-                        size="lg"
-                        glow
-                        onPress={handleSubmitMeme}
-                        loading={isSubmitting}
-                        icon={<Ionicons name="send" size={24} color={colors.background.primary} />}
-                      />
-                    </View>
-                  </View>
-                </Animated.View>
-              )
+              ) : currentPhoto ? (
+                // Player - Caption Editor
+                <CaptionEditor
+                  photoUrl={currentPhoto.photoUrl}
+                  onSubmit={handleCaptionSubmit}
+                  isSubmitting={isSubmitting}
+                />
+              ) : null
             )}
 
             {/* JUDGING PHASE */}
@@ -511,33 +492,26 @@ export default function GameScreen() {
               )
             )}
 
-            {/* RESULTS PHASE (when celebration not showing) */}
-            {currentGame.status === 'results' && !showCelebration && (
-              <Animated.View
-                entering={FadeIn}
-                className="flex-1 items-center justify-center"
-              >
-                <MaterialCommunityIcons
-                  name="trophy"
-                  size={80}
-                  color={colors.accent.gold}
-                />
-                <Text className="text-white text-3xl font-black mt-4">
-                  Round Winner!
-                </Text>
-                <Text className="text-accent-gold text-2xl font-bold mt-2">
-                  {roundWinner?.displayName || 'Unknown'}
-                </Text>
+            {/* VOTING PHASE - People's Choice */}
+            {currentGame.status === 'voting' && (
+              <VotingCard
+                submissions={currentGame.submissions || {}}
+                players={players}
+                judgeWinnerId={currentGame.judgeWinnerId}
+              />
+            )}
 
-                <GameButton
-                  label="NEXT ROUND"
-                  variant="primary"
-                  size="xl"
-                  glow
-                  onPress={handleContinue}
-                  style={{ marginTop: 32 }}
-                />
-              </Animated.View>
+            {/* RESULTS PHASE */}
+            {currentGame.status === 'results' && !showCelebration && (
+              <VoteResults
+                judgeWinnerId={currentGame.judgeWinnerId}
+                audienceWinnerId={currentGame.audienceWinnerId}
+                submissions={currentGame.submissions || {}}
+                players={players}
+                voteCounts={voteCounts}
+                onContinue={handleContinue}
+                isHost={isHost}
+              />
             )}
           </View>
 
