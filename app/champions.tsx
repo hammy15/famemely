@@ -10,10 +10,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/authStore';
-import { subscribeToUserChampionCards } from '@/lib/firebase';
+import { DEMO_MODE, MOCK_CHAMPION_CARDS } from '@/lib/mock';
 import type { ChampionCard } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
 import { colors } from '@/constants/theme';
+
+// Only import Firebase if not in demo mode
+let firebaseFunctions: any = null;
+if (!DEMO_MODE) {
+  firebaseFunctions = require('@/lib/firebase');
+}
 
 export default function ChampionsScreen() {
   const user = useAuthStore((state) => state.user);
@@ -23,7 +29,16 @@ export default function ChampionsScreen() {
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = subscribeToUserChampionCards(user.id, (newCards) => {
+    if (DEMO_MODE) {
+      // Use mock champion cards in demo mode
+      setTimeout(() => {
+        setCards(MOCK_CHAMPION_CARDS);
+        setIsLoading(false);
+      }, 500);
+      return;
+    }
+
+    const unsubscribe = firebaseFunctions.subscribeToUserChampionCards(user.id, (newCards: ChampionCard[]) => {
       setCards(newCards);
       setIsLoading(false);
     });

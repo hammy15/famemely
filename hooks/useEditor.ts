@@ -4,7 +4,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { useEditorStore } from '@/stores/editorStore';
 import { useAuthStore } from '@/stores/authStore';
-import { uploadMeme } from '@/lib/firebase';
+import { DEMO_MODE, MOCK_MEME_URLS } from '@/lib/mock';
+
+// Only import Firebase if not in demo mode
+let firebaseFunctions: any = null;
+if (!DEMO_MODE) {
+  firebaseFunctions = require('@/lib/firebase');
+}
 
 export function useEditor() {
   const user = useAuthStore((state) => state.user);
@@ -73,11 +79,17 @@ export function useEditor() {
 
     setExporting(true);
     try {
+      if (DEMO_MODE) {
+        // In demo mode, just return the local URI or a mock URL
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+        return project.imageUri || MOCK_MEME_URLS[0];
+      }
+
       // In a real app, we'd capture the canvas view and upload
       // For now, just upload the base image
       const response = await fetch(project.imageUri);
       const blob = await response.blob();
-      const url = await uploadMeme(user.id, blob);
+      const url = await firebaseFunctions.uploadMeme(user.id, blob);
       return url;
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to save meme');

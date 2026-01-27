@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '@/types';
-import { sendMessage, subscribeToChat } from '@/lib/firebase';
+import { DEMO_MODE, MOCK_CHAT_MESSAGES, mockDelay } from '@/lib/mock';
+import { Timestamp } from 'firebase/firestore';
+
+// Only import Firebase if not in demo mode
+let firebaseFunctions: any = null;
+if (!DEMO_MODE) {
+  firebaseFunctions = require('@/lib/firebase');
+}
 
 interface ChatState {
   // State
@@ -28,7 +35,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentUnsubscribe();
     }
 
-    const unsubscribe = subscribeToChat(gameId, (messages) => {
+    if (DEMO_MODE) {
+      // Use mock chat messages in demo mode
+      setTimeout(() => {
+        set({ messages: MOCK_CHAT_MESSAGES });
+      }, 500);
+      set({ unsubscribe: () => {} });
+      return;
+    }
+
+    const unsubscribe = firebaseFunctions.subscribeToChat(gameId, (messages: ChatMessage[]) => {
       set({ messages });
     });
 
@@ -39,8 +55,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!message.trim()) return;
 
     set({ isLoading: true, error: null });
+
+    if (DEMO_MODE) {
+      await mockDelay(200);
+      const newMessage: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        senderId,
+        senderName,
+        message,
+        timestamp: Timestamp.now(),
+      };
+      set((state) => ({
+        messages: [...state.messages, newMessage],
+        isLoading: false,
+      }));
+      return;
+    }
+
     try {
-      await sendMessage(gameId, senderId, senderName, message);
+      await firebaseFunctions.sendMessage(gameId, senderId, senderName, message);
       set({ isLoading: false });
     } catch (error: any) {
       set({

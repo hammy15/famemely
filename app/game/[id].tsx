@@ -24,8 +24,14 @@ import { useAuthStore } from '@/stores/authStore';
 import { useGameStore } from '@/stores/gameStore';
 import { useChatStore } from '@/stores/chatStore';
 import { formatTimer, getInitials } from '@/lib/utils';
-import { uploadMeme } from '@/lib/firebase';
+import { DEMO_MODE, MOCK_MEME_URLS } from '@/lib/mock';
 import { colors } from '@/constants/theme';
+
+// Only import Firebase if not in demo mode
+let firebaseFunctions: any = null;
+if (!DEMO_MODE) {
+  firebaseFunctions = require('@/lib/firebase');
+}
 
 // Components
 import GameChat from '@/components/chat/GameChat';
@@ -139,9 +145,17 @@ export default function GameScreen() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(memeUri);
-      const blob = await response.blob();
-      const memeUrl = await uploadMeme(user.id, blob);
+      let memeUrl: string;
+
+      if (DEMO_MODE) {
+        // In demo mode, use the local URI or a random mock URL
+        memeUrl = memeUri || MOCK_MEME_URLS[Math.floor(Math.random() * MOCK_MEME_URLS.length)];
+      } else {
+        const response = await fetch(memeUri);
+        const blob = await response.blob();
+        memeUrl = await firebaseFunctions.uploadMeme(user.id, blob);
+      }
+
       await submitPlayerMeme(user.id, memeUrl);
       setMemeUri(null);
     } catch (error: any) {
