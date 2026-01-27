@@ -26,6 +26,7 @@ import { getInitials } from '@/lib/utils';
 import { colors } from '@/constants/theme';
 import GameButton from '@/components/game/GameButton';
 import PlayerPuck from '@/components/game/PlayerPuck';
+import RulesConfig from '@/components/game/RulesConfig';
 
 export default function GameLobbyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,6 +39,7 @@ export default function GameLobbyScreen() {
     subscribeToCurrentGame,
     startGame,
     leaveGame,
+    updateGameSettings,
   } = useGameStore();
 
   const [isReady, setIsReady] = useState(false);
@@ -312,29 +314,12 @@ export default function GameLobbyScreen() {
         </View>
 
         {/* Game Settings */}
-        <View className="bg-background-secondary rounded-xl p-4 mb-4">
-          <View className="flex-row justify-around">
-            <View className="items-center">
-              <Text className="text-primary-500 text-2xl font-black">
-                {currentGame.totalRounds}
-              </Text>
-              <Text className="text-gray-400 text-sm">Rounds</Text>
-            </View>
-            <View className="w-px bg-gray-700 h-full" />
-            <View className="items-center">
-              <Text className="text-secondary-500 text-2xl font-black">
-                {currentGame.settings?.timePerRound || 60}s
-              </Text>
-              <Text className="text-gray-400 text-sm">Per Round</Text>
-            </View>
-            <View className="w-px bg-gray-700 h-full" />
-            <View className="items-center">
-              <Text className="text-accent-gold text-2xl font-black">
-                {currentGame.maxPlayers}
-              </Text>
-              <Text className="text-gray-400 text-sm">Max</Text>
-            </View>
-          </View>
+        <View className="mb-4">
+          <RulesConfig
+            settings={currentGame.settings}
+            onUpdate={updateGameSettings}
+            isHost={isHost}
+          />
         </View>
 
         {/* Action Button */}
