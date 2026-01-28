@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isGamePlayer(gameData) {
+      return request.auth.uid in gameData.players;
+    }
+
+    function isGameHost(gameData) {
+      return request.auth.uid == gameData.hostId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (for game player info)
+      allow read: if isAuthenticated();
+
+      // Users can only create/update their own profile
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false; // No user deletion
+    }
+
+    // Games collection
+    match /games/{gameId} {
+      // Anyone authenticated can read games (needed to join by code)
+      allow read: if isAuthenticated();
+
+      // Anyone authenticated can create a game
+      allow create: if isAuthenticated()
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.players.hasOnly([request.auth.uid]);
+
+      // Players in the game can update it
+      allow update: if isAuthenticated()
+        && isGamePlayer(resource.data);
+
+      // Only host can delete game
+      allow delete: if isAuthenticated()
+        && isGameHost(resource.data);
+
+      // Chat subcollection
+      match /chat/{messageId} {
+        // Players can read all chat messages
+        allow read: if isAuthenticated();
+
+        // Players can send messages
+        allow create: if isAuthenticated()
+          && request.resource.data.senderId == request.auth.uid;
+
+        // No editing or deleting messages
+        allow update, delete: if false;
+      }
+    }
+
+    // Champion Cards collection
+    match /championCards/{cardId} {
+      // Anyone can read champion cards (for social sharing)
+      allow read: if true;
+
+      // System creates cards (through game logic)
+      // In production, this should be done via Cloud Functions
+      allow create: if isAuthenticated()
+        && request.resource.data.playerId == request.auth.uid;
+
+      // Owner can update likes (in production, use Cloud Functions)
+      allow update: if isAuthenticated();
+
+      // No deletion
+      allow delete: if false;
+    }
+
+    // Prompts collection (read-only for users)
+    match /prompts/{promptId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin only via Firebase console
+    }
+
+    // User settings/preferences
+    match /userSettings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

@@ -1,0 +1,67 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024; // Max 10MB
+    }
+
+    // Profile photos
+    match /profiles/{userId} {
+      // Anyone can read profile photos
+      allow read: if true;
+
+      // Only owner can upload their profile photo
+      allow write: if isAuthenticated()
+        && isOwner(userId)
+        && isValidImage();
+    }
+
+    // Meme uploads (game submissions)
+    match /memes/{userId}/{allPaths=**} {
+      // Anyone authenticated can read memes (for game viewing)
+      allow read: if true;
+
+      // Users can only upload to their own folder
+      allow write: if isAuthenticated()
+        && isOwner(userId)
+        && isValidImage();
+    }
+
+    // Game photos (uploaded during photo_upload phase)
+    match /gamePhotos/{gameId}/{photoId} {
+      // Anyone authenticated can read game photos
+      allow read: if isAuthenticated();
+
+      // Any authenticated user can upload game photos
+      allow write: if isAuthenticated()
+        && isValidImage();
+    }
+
+    // Champion card images
+    match /championCards/{cardId} {
+      // Anyone can read champion cards (for sharing)
+      allow read: if true;
+
+      // System creates champion cards
+      allow write: if isAuthenticated()
+        && isValidImage();
+    }
+
+    // Shared memes (for social sharing)
+    match /shared/{shareId} {
+      allow read: if true;
+      allow write: if isAuthenticated()
+        && isValidImage();
+    }
+  }
+}
